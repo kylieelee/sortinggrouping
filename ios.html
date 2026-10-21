@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sorting &amp; Grouping iOS — Alertive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --navy-40:#14304c; --navy-50:#0c2237; --label:#000; --label-2:rgba(60,60,67,.6); --text-10:#5c5d5f; --menu-label:#5b6c7d;
+    --bar-bg:#f2f2f9; --fill-3:rgba(120,120,128,.12); --seg-bg:rgba(118,118,128,.12); --sep:rgba(84,84,86,.34);
+    --group-bg:#dde2e7; --chip-enabled:#eeeeef; --chip-active:#b6bdc3;
+    --task:#800080; --urgent:#ff3b30; --high:#ff0000; --medium:#eb8333; --low:#43a047; --flag:#ef6c00; --pin:#ff9500;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:#e9ecef; font-family:-apple-system, 'SF Pro Text', 'SF Pro', system-ui, 'Helvetica Neue', sans-serif; color:var(--label); -webkit-font-smoothing:antialiased; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  img { display:block; }
+  svg { display:block; flex-shrink:0; }
+
+  .page { min-height:100vh; padding:32px 16px; display:flex; justify-content:center; align-items:flex-start; gap:32px; flex-wrap:wrap; }
+
+  /* ---------- device (402 × 874, iPhone 16 Pro) ---------- */
+  .screen { position:relative; width:402px; height:874px; background:#fff; border-radius:48px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+
+  .navbar { position:absolute; top:0; left:0; width:402px; height:190px; z-index:3; background:var(--bar-bg); border-bottom:.333px solid rgba(0,0,0,.3); }
+  .status-bar { height:54px; padding-top:21px; display:flex; align-items:center; }
+  .status-bar .time { flex:1 0 0; text-align:center; padding:0 6px 0 16px; font-size:17px; line-height:22px; font-weight:590; }
+  .status-bar .island { width:124px; height:10px; }
+  .status-bar .levels { flex:1 0 0; display:flex; gap:7px; align-items:center; justify-content:center; padding:0 16px 0 6px; }
+  .island-pill { position:absolute; top:11px; left:50%; width:126px; height:37px; margin-left:-63px; border-radius:20px; background:#000; }
+
+  .title-row { position:relative; height:44px; }
+  .back { position:absolute; left:0; top:0; height:44px; padding:0 8px; display:flex; align-items:center; gap:6px; color:var(--navy-40); font-size:17px; line-height:22px; letter-spacing:-.43px; }
+  .nav-title { position:absolute; left:121px; top:11px; width:160px; text-align:center; font-size:17px; line-height:22px; font-weight:590; letter-spacing:-.43px; }
+  .more { position:absolute; right:16px; top:0; height:44px; display:flex; align-items:center; color:var(--navy-40); }
+
+  .chips { display:flex; gap:8px; padding:8px 16px; height:44px; }
+  .chip { flex:1 0 0; min-width:0; height:28px; padding:4px 10px; border-radius:40px; background:var(--fill-3); color:var(--navy-40); display:flex; align-items:center; gap:6px; font-size:15px; line-height:20px; letter-spacing:-.23px; text-align:left; }
+  .chip.active { background:var(--navy-40); color:#fff; }
+  .chip .label { flex:1 0 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chip .label b { font-weight:700; }
+
+  .seg-wrap { padding:8px 16px; }
+  .seg { height:32px; display:flex; align-items:center; padding:2px; border-radius:8px; background:var(--seg-bg); }
+  .seg button { flex:1 0 0; height:100%; border-radius:6px; font-size:15px; line-height:20px; letter-spacing:-.24px; position:relative; }
+  .seg button.on { background:#fff; font-weight:600; box-shadow:0 3px 4px rgba(0,0,0,.12), 0 3px .5px rgba(0,0,0,.04); }
+  .seg button + button:not(.on)::before { content:''; position:absolute; left:0; top:7px; bottom:7px; width:.64px; background:rgba(142,142,147,.3); }
+  .seg button.on + button::before { display:none; }
+
+  .rows { position:absolute; top:190px; left:0; bottom:78px; width:402px; overflow-y:auto; background:#fff; }
+  .rows::-webkit-scrollbar { display:none; }
+  .group-header { background:var(--group-bg); padding:4px 12px; font-size:13px; line-height:18px; font-weight:590; letter-spacing:-.08px; color:var(--navy-40); text-transform:uppercase; }
+
+  .row { position:relative; display:flex; align-items:stretch; width:100%; text-align:left; background:#fff; touch-action:pan-y; user-select:none; }
+  .row:active { background:#f2f2f7; }
+
+  /* Leading swipe action (iOS Notes/Messages pattern): drag a row right to Pin / Unpin */
+  .swipe { position:relative; overflow:hidden; }
+  .swipe-track { position:relative; transition:transform .25s cubic-bezier(.2,.8,.2,1); }
+  .swipe.dragging .swipe-track { transition:none; }
+  .swipe-action { position:absolute; inset:0 auto 0 0; width:100%; background:var(--pin); color:#fff; display:flex; align-items:center; padding-left:22px; }
+  .swipe-action span { width:52px; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:13px; line-height:16px; font-weight:500; }
+  .row .strip { width:8px; flex-shrink:0; }
+  .row.task .strip { background:var(--task); }
+  .row.alert .strip { background:var(--high); }
+  .row .meta { display:flex; align-items:center; gap:4px; height:18px; font-size:13px; line-height:18px; letter-spacing:-.08px; color:#000; }
+  /* Pill is authored at 1.1x and scaled to 83% in Figma (72:4866) */
+  .row .pill { padding:1.8px 8.2px; border-radius:11px; font-family:Roboto, -apple-system, sans-serif; font-size:11px; line-height:12.4px; font-weight:500; letter-spacing:.37px; color:#000; white-space:nowrap; }
+  .row .line { font-size:13px; line-height:18px; letter-spacing:-.08px; color:#090909; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .line.secondary { color:var(--label-2); }
+  .row .contents { flex:1 0 0; min-width:0; padding-left:16px; display:flex; }
+  .row.has-strip .contents { padding-left:10px; }
+  .row .cell { flex:1 0 0; min-width:0; display:flex; border-bottom:.333px solid var(--sep); padding:4px 0; }
+  .row .main { flex:1 0 0; min-width:0; display:flex; flex-direction:column; gap:8px; justify-content:center; }
+  .row .title { display:flex; align-items:center; gap:6px; height:22px; font-size:15px; line-height:20px; font-weight:590; letter-spacing:-.23px; }
+  .row .title .t { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .row .preview { font-size:13px; line-height:18px; letter-spacing:-.08px; color:var(--label-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .row .created { font-size:12px; line-height:16px; color:var(--label-2); }
+  .row .side { width:77px; flex-shrink:0; position:relative; padding:4px 32px 0 8px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .row .time { font-size:13px; line-height:18px; letter-spacing:-.08px; color:var(--label-2); white-space:nowrap; margin-top:7px; }
+  .row.unread .time { color:var(--navy-40); }
+  .row .dot { position:absolute; right:7px; top:15px; width:10px; height:10px; border-radius:50%; background:var(--navy-40); }
+  .row .badges { display:flex; gap:6px; align-items:center; margin-top:2px; }
+  .row .flag { color:var(--flag); }
+  .row .pin-badge { color:var(--label-2); display:flex; }
+  .row .pin-badge svg { width:12px; height:13px; }
+
+  .toolbar { position:absolute; left:0; bottom:0; width:402px; height:78px; z-index:2; background:var(--bar-bg); border-top:1px solid #ddd; padding:9px 16px 40px; display:flex; align-items:center; justify-content:space-between; color:var(--navy-40); }
+  .toolbar-spacer { width:30px; } /* keeps the unread count centred */
+  .toolbar .count { font-size:13px; line-height:18px; letter-spacing:-.08px; color:#000; }
+  .home-indicator { position:absolute; left:50%; bottom:8px; width:144px; height:5px; margin-left:-72px; border-radius:100px; background:#000; z-index:4; }
+
+  .scrim { position:absolute; inset:0; z-index:4; }
+  .menu { position:absolute; top:142px; width:250px; border-radius:12px; overflow:hidden; z-index:5;
+          background:rgba(246,246,246,.9); -webkit-backdrop-filter:blur(25px); backdrop-filter:blur(25px); box-shadow:0 0 16px rgba(0,0,0,.2);
+          transform-origin:top center; animation:pop .18s ease-out; }
+  @keyframes pop { from { opacity:0; transform:scale(.92); } }
+  .menu .opt { display:flex; align-items:center; width:100%; height:44px; padding:0 16px; text-align:left; font-size:17px; line-height:22px; letter-spacing:-.43px; border-bottom:.5px solid rgba(128,128,128,.55); }
+  .menu .opt:last-child { border-bottom:0; }
+  .menu .opt:active { background:rgba(0,0,0,.06); }
+  .menu .opt span { flex:1 0 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- prototype controls (outside the device) ---------- */
+  .panel { width:280px; font-size:14px; color:var(--navy-50); }
+  .panel h1 { font-size:18px; line-height:24px; margin:0 0 4px; font-weight:700; }
+  .panel p { margin:0 0 16px; color:var(--text-10); line-height:20px; }
+  .panel h2 { font-size:12px; line-height:16px; letter-spacing:.5px; font-weight:500; color:var(--menu-label); margin:20px 0 8px; text-transform:uppercase; }
+  .frames { display:flex; flex-direction:column; gap:4px; }
+  .frame { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:8px 10px; border-radius:8px; background:#fff; border:1px solid transparent; line-height:18px; }
+  .frame:hover { border-color:var(--chip-active); }
+  .frame.current { background:var(--navy-50); color:#fff; }
+  .frame .n { width:22px; height:22px; border-radius:50%; background:var(--chip-enabled); color:var(--navy-50); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .frame.current .n { background:#28bad1; color:var(--navy-50); }
+  .frame small { display:block; font-size:11px; opacity:.7; }
+  .reset { margin-top:16px; font-size:13px; text-decoration:underline; color:var(--navy-40); }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+// Icons inlined so this file works on its own
+const ICON = {
+  "battery.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI3LjMyOCIgaGVpZ2h0PSIxMyIgdmlld0JveD0iMCAwIDI3LjMyOCAxMyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGcgaWQ9IkJhdHRlcnkiPgo8bWFzayBpZD0ic3Ryb2tlMF8wXzIzMiIgZmlsbD0id2hpdGUiPgo8cGF0aCBkPSJNMCA2LjVDMCA0LjQ0OTUgMCAzLjQyNDI1IDAuMzQyNTExIDIuNjE4MjVDMC43Nzc5MDUgMS41OTM2OCAxLjU5MzY4IDAuNzc3OTA1IDIuNjE4MjUgMC4zNDI1MTFDMy40MjQyNSAwIDQuNDQ5NSAwIDYuNSAwSDE4LjVDMjAuNTUwNSAwIDIxLjU3NTggMCAyMi4zODE4IDAuMzQyNTExQzIzLjQwNjMgMC43Nzc5MDUgMjQuMjIyMSAxLjU5MzY4IDI0LjY1NzUgMi42MTgyNUMyNSAzLjQyNDI1IDI1IDQuNDQ5NSAyNSA2LjVWNi41QzI1IDguNTUwNSAyNSA5LjU3NTc1IDI0LjY1NzUgMTAuMzgxOEMyNC4yMjIxIDExLjQwNjMgMjMuNDA2MyAxMi4yMjIxIDIyLjM4MTggMTIuNjU3NUMyMS41NzU4IDEzIDIwLjU1MDUgMTMgMTguNSAxM0g2LjVDNC40NDk1IDEzIDMuNDI0MjUgMTMgMi42MTgyNSAxMi42NTc1QzEuNTkzNjggMTIuMjIyMSAwLjc3NzkwNSAxMS40MDYzIDAuMzQyNTExIDEwLjM4MThDMCA5LjU3NTc1IDAgOC41NTA1IDAgNi41VjYuNVoiLz4KPC9tYXNrPgo8cGF0aCBpZD0iQm9yZGVyIiBvcGFjaXR5PSIwLjM1IiBkPSJNNi41IDEzSDE4LjVDMjAuNTUwNSAxMyAyMS41NzU4IDEzIDIyLjM4MTcgMTIuNjU3NUMyMy40MDYzIDEyLjIyMjEgMjQuMjIyMSAxMS40MDYzIDI0LjY1NzUgMTAuMzgxN0MyNSA5LjU3NTc1IDI1IDguNTUwNSAyNSA2LjVWNi41QzI1IDQuNDQ5NSAyNSAzLjQyNDI1IDI0LjY1NzUgMi42MTgyNUMyNC4yMjIxIDEuNTkzNjggMjMuNDA2MyAwLjc3NzkwNSAyMi4zODE3IDAuMzQyNTExQzIxLjU3NTggMCAyMC41NTA1IDAgMTguNSAwSDYuNUM0LjQ0OTUgMCAzLjQyNDI1IDAgMi42MTgyNSAwLjM0MjUxMUMxLjU5MzY4IDAuNzc3OTA1IDAuNzc3OTA1IDEuNTkzNjggMC4zNDI1MTEgMi42MTgyNUMwIDMuNDI0MjUgMCA0LjQ0OTUgMCA2LjVWNi41QzAgOC41NTA1IDAgOS41NzU3NSAwLjM0MjUxMSAxMC4zODE3QzAuNzc3OTA1IDExLjQwNjMgMS41OTM2OCAxMi4yMjIxIDIuNjE4MjUgMTIuNjU3NUMzLjQyNDI1IDEzIDQuNDQ5NSAxMyA2LjUgMTNaIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZT0iYmxhY2siIG1hc2s9InVybCgjc3Ryb2tlMF8wXzIzMikiLz4KPHBhdGggaWQ9IkNhcCIgb3BhY2l0eT0iMC40IiBkPSJNMjYgNC43ODExM1Y4Ljg1NjZDMjYuODA0NyA4LjUxMTQzIDI3LjMyOCA3LjcwODQ3IDI3LjMyOCA2LjgxODg2QzI3LjMyOCA1LjkyOTI2IDI2LjgwNDcgNS4xMjYzIDI2IDQuNzgxMTMiIGZpbGw9ImJsYWNrIi8+CjxyZWN0IGlkPSJDYXBhY2l0eSIgeD0iMiIgeT0iMiIgd2lkdGg9IjIxIiBoZWlnaHQ9IjkiIHJ4PSIyLjUiIGZpbGw9ImJsYWNrIi8+CjwvZz4KPC9zdmc+Cg==",
+  "cellular.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE5LjIiIGhlaWdodD0iMTIuMjI2NCIgdmlld0JveD0iMCAwIDE5LjIgMTIuMjI2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggaWQ9IkNlbGx1bGFyIENvbm5lY3Rpb24iIGQ9Ik0xOS4yIDEuMTQ2MjNDMTkuMiAwLjUxMzE4MyAxOC43MjI0IDAgMTguMTMzMyAwSDE3LjA2NjdDMTYuNDc3NiAwIDE2IDAuNTEzMTgzIDE2IDEuMTQ2MjNWMTEuMDgwMkMxNiAxMS43MTMyIDE2LjQ3NzYgMTIuMjI2NCAxNy4wNjY3IDEyLjIyNjRIMTguMTMzM0MxOC43MjI0IDEyLjIyNjQgMTkuMiAxMS43MTMyIDE5LjIgMTEuMDgwMlYxLjE0NjIzWk0xMS43NjU5IDIuNDQ1MjhIMTIuODMyNkMxMy40MjE3IDIuNDQ1MjggMTMuODk5MiAyLjk3MDc4IDEzLjg5OTIgMy42MTkwMlYxMS4wNTI3QzEzLjg5OTIgMTEuNzAwOSAxMy40MjE3IDEyLjIyNjQgMTIuODMyNiAxMi4yMjY0SDExLjc2NTlDMTEuMTc2OCAxMi4yMjY0IDEwLjY5OTIgMTEuNzAwOSAxMC42OTkyIDExLjA1MjdWMy42MTkwMkMxMC42OTkyIDIuOTcwNzggMTEuMTc2OCAyLjQ0NTI4IDExLjc2NTkgMi40NDUyOFpNNy40MzQxMSA1LjA5NDMzSDYuMzY3NDVDNS43NzgzNCA1LjA5NDMzIDUuMzAwNzggNS42MjY1MiA1LjMwMDc4IDYuMjgzMDFWMTEuMDM3N0M1LjMwMDc4IDExLjY5NDIgNS43NzgzNCAxMi4yMjY0IDYuMzY3NDUgMTIuMjI2NEg3LjQzNDExQzguMDIzMjIgMTIuMjI2NCA4LjUwMDc4IDExLjY5NDIgOC41MDA3OCAxMS4wMzc3VjYuMjgzMDFDOC41MDA3OCA1LjYyNjUyIDguMDIzMjIgNS4wOTQzMyA3LjQzNDExIDUuMDk0MzNaTTIuMTMzMzMgNy41Mzk2MkgxLjA2NjY3QzAuNDc3NTYzIDcuNTM5NjIgMCA4LjA2NDIxIDAgOC43MTEzMlYxMS4wNTQ3QzAgMTEuNzAxOCAwLjQ3NzU2MyAxMi4yMjY0IDEuMDY2NjcgMTIuMjI2NEgyLjEzMzMzQzIuNzIyNDQgMTIuMjI2NCAzLjIgMTEuNzAxOCAzLjIgMTEuMDU0N1Y4LjcxMTMyQzMuMiA4LjA2NDIxIDIuNzIyNDQgNy41Mzk2MiAyLjEzMzMzIDcuNTM5NjJaIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZmlsbD0iYmxhY2siLz4KPC9zdmc+Cg==",
+  "wifi.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE3LjE0MTciIGhlaWdodD0iMTIuMzI4MyIgdmlld0JveD0iMCAwIDE3LjE0MTcgMTIuMzI4MyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggaWQ9IldpZmkiIGQ9Ik04LjU3MTMgMi40NjYyOEMxMS4wNTg0IDIuNDY2MzkgMTMuNDUwNCAzLjM4ODQ3IDE1LjI1MjkgNS4wNDE5NUMxNS4zODg3IDUuMTY5NiAxNS42MDU2IDUuMTY3OTkgMTUuNzM5MyA1LjAzODM0TDE3LjAzNjggMy43NzQ4N0MxNy4xMDQ1IDMuNzA5MTEgMTcuMTQyMiAzLjYyMDA0IDE3LjE0MTcgMy41MjczNUMxNy4xNDExIDMuNDM0NjcgMTcuMTAyMyAzLjM0NjAzIDE3LjAzMzggMy4yODEwNEMxMi4zMDI4IC0xLjA5MzY4IDQuODM5MDcgLTEuMDkzNjggMC4xMDgwNTYgMy4yODEwNEMwLjAzOTUyNCAzLjM0NTk4IDAuMDAwNjM5NzY2IDMuNDM0NiA3LjgyMzk4ZS0wNiAzLjUyNzI4Qy0wLjAwMDYyNDExOCAzLjYxOTk2IDAuMDM3MDQ4MyAzLjcwOTA2IDAuMTA0Njg5IDMuNzc0ODdMMS40MDI1NSA1LjAzODM0QzEuNTM2MTUgNS4xNjgxOSAxLjc1MzI3IDUuMTY5OCAxLjg4ODkzIDUuMDQxOTVDMy42OTE2NyAzLjM4ODM2IDYuMDgzOTUgMi40NjYyOCA4LjU3MTMgMi40NjYyOFpNOC41Njc5NSA2LjY4NjU2QzkuOTI1MjcgNi42ODY0NyAxMS4yMzQxIDcuMTk4MjEgMTIuMjQwMyA4LjEyMjM0QzEyLjM3NjMgOC4yNTM1IDEyLjU5MDcgOC4yNTA2NSAxMi43MjM0IDguMTE1OTNMMTQuMDEwNiA2Ljc5NjYzQzE0LjA3ODQgNi43Mjc0MiAxNC4xMTYxIDYuNjMzNTUgMTQuMTE1MSA2LjUzNTk5QzE0LjExNDEgNi40Mzg0NCAxNC4wNzQ2IDYuMzQ1MzYgMTQuMDA1NCA2LjI3NzU3QzEwLjk0MTYgMy4zODY3MiA2LjE5Njg4IDMuMzg2NzIgMy4xMzMwNSA2LjI3NzU3QzMuMDYzODQgNi4zNDUzNiAzLjAyNDM1IDYuNDM4NDkgMy4wMjM0NSA2LjUzNjA3QzMuMDIyNTQgNi42MzM2NSAzLjA2MDI4IDYuNzI3NTIgMy4xMjgyMiA2Ljc5NjYzTDQuNDE1MTMgOC4xMTU5M0M0LjU0Nzc4IDguMjUwNjUgNC43NjIxNSA4LjI1MzUgNC44OTgyMyA4LjEyMjM0QzUuOTAzNjggNy4xOTg4MiA3LjIxMTUyIDYuNjg3MTMgOC41Njc5NSA2LjY4NjU2Wk0xMS4wOTI0IDkuNDgwMTFDMTEuMDk0MyA5LjU4NTQ2IDExLjA1NzIgOS42ODcwMyAxMC45ODk5IDkuNzYwODRMOC44MTMyNyAxMi4yMTU2QzguNzQ5NDYgMTIuMjg3NyA4LjY2MjQ3IDEyLjMyODMgOC41NzE3IDEyLjMyODNDOC40ODA5MyAxMi4zMjgzIDguMzkzOTQgMTIuMjg3NyA4LjMzMDEzIDEyLjIxNTZMNi4xNTMxIDkuNzYwODRDNi4wODU4NSA5LjY4Njk3IDYuMDQ4ODYgOS41ODUzNyA2LjA1MDg1IDkuNDgwMDJDNi4wNTI4NCA5LjM3NDY3IDYuMDkzNjUgOS4yNzQ5MSA2LjE2MzY0IDkuMjA0MjlDNy41NTM3NCA3Ljg5MDQgOS41ODk2NiA3Ljg5MDQgMTAuOTc5OCA5LjIwNDI5QzExLjA0OTcgOS4yNzQ5NyAxMS4wOTA0IDkuMzc0NzYgMTEuMDkyNCA5LjQ4MDExWiIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9ImJsYWNrIi8+Cjwvc3ZnPgo="
+};
+
+/* ---------------- data (same messages as the Android prototype) ---------------- */
+
+// updated = minutes since midnight 5 Aug (drives the time column + "updated" sorts)
+// created = minutes relative to midnight 5 Aug (negative = 4 Aug)
+const ITEMS = [
+  { id:'ward4',   kind:'chat',   title:'Ward 4 Nursing Team', unread:true,  updated:16*60+51, created:9*60+30,
+    preview:'Caty Sovejanu: nothing new yet, handover note was vague so waiting on the SHO…', priority:null, status:null },
+  { id:'bloods',  kind:'task',   title:'Bloods — Bay 3, Mr A. Okafor', unread:true, updated:16*60+40, created:8*60+12,
+    priority:'medium', type:'Bloods', site:'Derby Royal', ward:'Ward 4', bay:'Bay 3', status:'In Progress',
+    statusDetail:'In progress at 13:13', raisedBy:'Kylie Lee' },
+  { id:'cardiac', flagged:true, kind:'alert',  title:'Cardiac arrest — ICU Bed 2', unread:true, updated:16*60+12, created:16*60+10,
+    priority:'urgent', detail:'Broadcast · Raised by Switchboard · 3 responders', ward:'ICU', status:'Awaiting response',
+    raisedBy:'Emergency Switchboard' },
+  { id:'cannula', flagged:true, kind:'task',   title:'💉 Cannula re-site — Bay 1', unread:false, updated:15*60+35, created:11*60+5,
+    priority:'high', type:'Cannula', site:'Derby Royal', ward:'Ward 7', bay:'Bay 1', status:'In Progress',
+    statusDetail:'Done at 12:45', raisedBy:'Cardiology Registrar' },
+  { id:'head',    flagged:true, kind:'person', title:'Head Nurse', unread:false, updated:14*60+59, created:13*60+20,
+    preview:'Head Nurse: chest film for bay 5 is back on PACS, reported as clear', priority:null, status:null },
+  { id:'luke',    kind:'person', title:'Luke Morgan', unread:false, updated:12*60+9, created:-(24*60)+22*60+40,
+    preview:'Luke Morgan: I can cover the twilight shift tomorrow reported as clear', priority:null, status:null },
+  // Extra example messages. Created 11:06–11:52 and updated before 12:09, so the Figma frames' top rows stay in the same order.
+  { id:'fall',    flagged:true, kind:'alert', title:'Patient fall — Ward 7, Bay 4', unread:true, updated:12*60+1, created:11*60+52,
+    priority:'high', ward:'Ward 7', status:'Awaiting response', raisedBy:'Ward 7 Nurse in Charge' },
+  { id:'obs',     kind:'task',   title:'Obs round — Bay 5', unread:false, updated:11*60+58, created:11*60+20,
+    priority:'medium', type:'Observations', site:'Derby Royal', ward:'Ward 7', bay:'Bay 5', status:'Done',
+    statusDetail:'Done at 11:58', raisedBy:'Caty Sovejanu' },
+  { id:'pharmacy', kind:'chat',  title:'Pharmacy Queries', unread:false, updated:11*60+47, created:11*60+12,
+    preview:'Priya Nair: TTOs for bay 6 are ready for collection, can someone from Ward 7 pop down?', priority:null, status:null },
+  { id:'sarah',   flagged:true, kind:'person', title:'Dr Sarah Patel', unread:true, updated:11*60+40, created:11*60+30,
+    preview:'Dr Sarah Patel: can you chase the bloods for Mr Okafor before the ward round?', priority:null, status:null },
+  { id:'ecg',     kind:'task',   title:'ECG — Bay 2, Mrs D. Whitfield', unread:true, updated:11*60+33, created:11*60+15,
+    priority:'high', type:'ECG', site:'Derby Royal', ward:'Ward 4', bay:'Bay 2', status:'Awaiting response',
+    statusDetail:'Awaiting response', raisedBy:'Dr Sarah Patel' },
+  { id:'beds',    kind:'chat',   title:'Bed Management', unread:false, updated:11*60+21, created:11*60+8,
+    preview:'Tom Reid: 2 side rooms free on Ward 7 from midday, flag any infection control needs', priority:null, status:null },
+  { id:'pressure', kind:'task',  title:'Pressure area check — Bay 8, Mrs E. Clarke', unread:false, updated:11*60+50, created:11*60+25,
+    priority:'low', type:'Skin integrity', site:'Derby Royal', ward:'Ward 4', bay:'Bay 8', status:'In Progress',
+    statusDetail:'In progress at 11:50', raisedBy:'Head Nurse' },
+  { id:'catheter', kind:'task',  title:'Catheter review — Bay 6, Mr J. Hughes', unread:false, updated:11*60+10, created:11*60+6,
+    priority:null, type:'Catheter', site:'Derby Royal', ward:'Ward 7', bay:'Bay 6', status:'In Progress',
+    statusDetail:'In progress at 11:10', raisedBy:'Luke Morgan' },
+];
+
+const SORTS = [
+  { key:'lastUpdated',  label:'Last updated', menu:'Last updated (Default)', cmp:(a,b)=>b.updated-a.updated },
+  { key:'firstUpdated', label:'First updated', cmp:(a,b)=>a.updated-b.updated },
+  { key:'lastCreated',  label:'Last created',  cmp:(a,b)=>b.created-a.created },
+  { key:'firstCreated', label:'First created', cmp:(a,b)=>a.created-b.created },
+];
+
+// Order matches the GROUP BY menu in Figma (96:9496 / 96:9784)
+const GROUPS = [
+  { key:'none',     label:'None' },
+  { key:'read',     label:'Read/Unread',      by:i => i.unread ? 'Unread' : 'Read', order:['Unread','Read'] },
+  { key:'status',   label:'Status',           by:i => i.status || 'No status', order:['Awaiting response','In Progress','Done','No status'] },
+  { key:'priority', label:'Priority',         by:i => ({urgent:'Urgent',high:'High',medium:'Medium',low:'Low'})[i.priority] || 'No priority',
+                                              order:['Urgent','High','Medium','Low','No priority'] },
+  { key:'patientLocation', label:'Patient Location', by:i => i.bay ? `${i.ward}, ${i.bay}` : 'No patient location', last:'No patient location' },
+  { key:'location', label:'Location',         by:i => i.ward || 'No location', last:'No location' },
+  { key:'taskType', label:'Task Type',        by:i => i.type || 'No task type', last:'No task type' },
+  { key:'flagged',  label:'Flagged',          by:i => i.flagged ? 'Flagged' : 'Unflagged', order:['Flagged','Unflagged'] },
+];
+
+const TABS = [
+  { key:'all',    label:'All',    match:() => true },
+  { key:'chats',  label:'Chats',  match:i => i.kind === 'chat' || i.kind === 'person' },
+  { key:'alerts', label:'Alerts', match:i => i.kind === 'alert' },
+  { key:'tasks',  label:'Tasks',  match:i => i.kind === 'task' },
+];
+
+
+// The 7 iOS Figma frames, in flow order
+const FRAMES = [
+  { node:'72:1130', title:'Default list',          sub:'Last updated',         state:{ sort:'lastUpdated',  group:'none',     menu:null } },
+  { node:'72:3619', title:'Sort menu',             sub:'Last updated',         state:{ sort:'lastUpdated',  group:'none',     menu:{ kind:'sort',  draft:'lastUpdated' } } },
+  { node:'72:4175', title:'Sort menu',             sub:'First created picked', state:{ sort:'lastUpdated',  group:'none',     menu:{ kind:'sort',  draft:'firstCreated' } } },
+  { node:'72:4485', title:'Sorted: First created', sub:'Sort chip active',     state:{ sort:'firstCreated', group:'none',     menu:null } },
+  { node:'72:4798', title:'Group menu',            sub:'None',                 state:{ sort:'firstCreated', group:'none',     menu:{ kind:'group', draft:'none' } } },
+  { node:'72:5274', title:'Group menu',            sub:'Priority picked',      state:{ sort:'firstCreated', group:'none',     menu:{ kind:'group', draft:'priority' } } },
+  { node:'72:5591', title:'Grouped: Priority',     sub:'Both chips active',    state:{ sort:'firstCreated', group:'priority', menu:null } },
+];
+
+// iOS shows 12-hour times ("4:51pm")
+const fmtTime12 = m => { const h = Math.floor(m/60), mm = String(m%60).padStart(2,'0'); return `${h % 12 || 12}:${mm}${h < 12 ? 'am' : 'pm'}`; };
+// "In progress at 13:13" → "In progress at 1:13pm"
+const to12h = str => str.replace(/(\d{1,2}):(\d{2})/, (_, h, mm) => fmtTime12(+h * 60 + +mm));
+const fmtTime = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+const fmtCreated = m => {
+  const day = m < 0 ? 4 : 5;
+  const mins = ((m % 1440) + 1440) % 1440;
+  return `Created ${day} Aug at ${fmtTime(mins)}`;
+};
+
+function groupItems(items, groupKey) {
+  const g = GROUPS.find(x => x.key === groupKey);
+  if (!g.by) return [{ label:null, items }];
+  const map = new Map();
+  items.forEach(i => { const k = g.by(i); if (!map.has(k)) map.set(k, []); map.get(k).push(i); });
+  const keys = [...map.keys()];
+  if (g.order) keys.sort((a,b) => g.order.indexOf(a) - g.order.indexOf(b));
+  // Items with no value for the grouping field sit at the bottom
+  if (g.last) keys.sort((a,b) => (a === g.last) - (b === g.last));
+  return keys.map(k => ({ label:k, items:map.get(k) }));
+}
+
+/* ---------------- SF Symbol stand-ins ---------------- */
+
+const Sym = {
+  chevronLeft: () => <svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  ellipsisCircle: () => <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.6" fill="none" stroke="currentColor" strokeWidth="1.6"/><circle cx="7" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="17" cy="12" r="1.5" fill="currentColor"/></svg>,
+  chevronDown: () => <svg width="14" height="9" viewBox="0 0 14 9"><path d="m1.5 1.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  checkmark: () => <svg width="18" height="16" viewBox="0 0 18 16"><path d="m1.5 9 5 5.5L16.5 1.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  compose: () => <svg width="30" height="29" viewBox="0 0 30 29"><path d="M14 4H6.5A2.5 2.5 0 0 0 4 6.5v16A2.5 2.5 0 0 0 6.5 25h16a2.5 2.5 0 0 0 2.5-2.5V15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M23.5 3.2a1.8 1.8 0 0 1 2.6 2.6L15 16.9l-3.6 1 1-3.6z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>,
+  flag: () => <svg className="flag" width="12" height="14" viewBox="0 0 14 16" role="img" aria-label="Flagged"><path d="M1.6 16V1.4M1.6 1.6c2-1 4-1 6 0s4 1 6 0v8c-2 1-4 1-6 0s-4-1-6 0" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>,
+  pin: () => <svg width="20" height="22" viewBox="0 0 20 22"><path d="M6 1.5h8l-1 6.5 3.5 3.8V13H3.5v-1.2L7 8z" fill="currentColor"/><path d="M10 13v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+  unpin: () => <svg width="20" height="22" viewBox="0 0 20 22"><path d="M6 1.5h8l-1 6.5 3.5 3.8V13H3.5v-1.2L7 8z" fill="currentColor"/><path d="M10 13v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M2.5 2.5 17.5 19.5" stroke="var(--pin)" strokeWidth="3.6" strokeLinecap="round"/><path d="M2.5 2.5 17.5 19.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  // Row type symbols: message.fill, person.fill, exclamationmark.triangle.fill, checkmark.square.fill
+  chat: () => <svg width="18" height="17" viewBox="0 0 18 17"><path d="M2 1h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 16 13H6l-4 3.5V13a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 2 1z" fill="#34a853"/><path d="M4.5 5h9M4.5 8.5h6" stroke="#fff" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+  person: () => <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="4.6" r="3.6" fill="#1a73e8"/><path d="M1 15.5c0-3.6 3.1-5.8 7-5.8s7 2.2 7 5.8z" fill="#1a73e8"/></svg>,
+  alert: () => <svg width="18" height="16" viewBox="0 0 18 16"><path d="M7.7 1.2a1.5 1.5 0 0 1 2.6 0l7.4 12.6A1.5 1.5 0 0 1 16.4 16H1.6a1.5 1.5 0 0 1-1.3-2.2z" fill="#ff3b30"/><path d="M9 5.2v5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="12.9" r="1.1" fill="#fff"/></svg>,
+  task: () => <svg width="16" height="16" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#800080"/><path d="m4 8.3 2.8 2.8L12.2 5" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+};
+
+/* ---------------- row ---------------- */
+
+const PRIORITY_COLOR = { urgent:'var(--urgent)', high:'var(--high)', medium:'var(--medium)', low:'var(--low)' };
+const PRIORITY_LABEL = { high:'High', medium:'Medium', low:'Low' };
+const KIND_SYM = { chat:Sym.chat, person:Sym.person, alert:Sym.alert, task:Sym.task };
+
+function Row({ item, pinned }) {
+  const isTask = item.kind === 'task';
+  // Tasks and alerts follow iOS frame 72:1130: 8px strip (purple task / red alert) and short detail lines
+  const hasStrip = isTask || item.kind === 'alert';
+  const KindIcon = KIND_SYM[item.kind];
+  return (
+    <button className={`row${item.unread ? ' unread' : ''}${hasStrip ? ' has-strip' : ''}${hasStrip ? ' ' + item.kind : ''}`}>
+      {hasStrip && <div className="strip" />}
+      <div className="contents">
+        <div className="cell">
+          <div className="main">
+            <div>
+              <div className="title"><KindIcon /><span className="t">{item.title}</span></div>
+              {isTask && (
+                <>
+                  <div className="meta">
+                    {PRIORITY_LABEL[item.priority] && <span className="pill" style={{ background:PRIORITY_COLOR[item.priority] }}>{PRIORITY_LABEL[item.priority]}</span>}
+                    <span>{item.type}</span>
+                  </div>
+                  <div className="line">{to12h(item.statusDetail)}</div>
+                </>
+              )}
+              {item.kind === 'alert' && (
+                <>
+                  <div className="line">{item.status}</div>
+                  <div className="line secondary">Raised by {item.raisedBy}</div>
+                </>
+              )}
+              {item.preview && <div className="preview">{item.preview}</div>}
+            </div>
+            <div className="created">{fmtCreated(item.created)}</div>
+          </div>
+          <div className="side">
+            <div className="time">{fmtTime12(item.updated)}</div>
+            {item.unread && <span className="dot" aria-label="Unread" />}
+            {/* iOS 18 Mail-style: flag sits in the trailing column, under the time */}
+            {(pinned || item.flagged) && (
+              <div className="badges">
+                {pinned && <span className="pin-badge" role="img" aria-label="Pinned"><Sym.pin /></span>}
+                {item.flagged && <Sym.flag />}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+const ACTION_W = 96, FULL_SWIPE = 200;
+
+// Drag right to reveal Pin/Unpin; a long drag pins straight away, a short one leaves the action open.
+function SwipeRow({ item, pinned, onTogglePin }) {
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const start = useRef(null);
+  const moved = useRef(false);
+
+  const down = e => { start.current = { x:e.clientX - x, y:e.clientY }; moved.current = false; e.currentTarget.setPointerCapture(e.pointerId); };
+  const move = e => {
+    if (!start.current) return;
+    const dx = e.clientX - start.current.x;
+    if (!moved.current && Math.abs(dx) < 6) return;
+    moved.current = true; setDragging(true);
+    setX(Math.max(0, Math.min(dx, 260)));
+  };
+  const up = () => {
+    if (!start.current) return;
+    start.current = null; setDragging(false);
+    if (x > FULL_SWIPE) { setX(0); onTogglePin(); }
+    else setX(x > ACTION_W / 2 ? ACTION_W : 0);
+  };
+  const click = e => { if (moved.current || x) { e.preventDefault(); if (!moved.current) setX(0); } };
+
+  return (
+    <div className={`swipe${dragging ? ' dragging' : ''}`}>
+      <button className="swipe-action" style={{ width: Math.max(x, ACTION_W) }} onClick={() => { setX(0); onTogglePin(); }} tabIndex={x ? 0 : -1}>
+        <span>{pinned ? <Sym.unpin /> : <Sym.pin />}{pinned ? 'Unpin' : 'Pin'}</span>
+      </button>
+      <div style={{ transform:`translateX(${x}px)` }} className="swipe-track"
+           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClickCapture={click}>
+        <Row item={item} pinned={pinned} />
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- pull-down menu ---------------- */
+
+function Menu({ kind, value, onPick, onClose }) {
+  const opts = kind === 'sort' ? SORTS : GROUPS;
+  return (
+    <>
+      <div className="scrim" onClick={onClose} />
+      <div className="menu" role="menu" style={{ left: kind === 'sort' ? 16 : 135 }}>
+        {opts.map(o => (
+          <button key={o.key} className="opt" role="menuitemradio" aria-checked={value === o.key} onClick={() => onPick(o.key)}>
+            <span>{o.menu || o.label}</span>
+            {value === o.key && <Sym.checkmark />}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ---------------- screen ---------------- */
+
+function Chip({ name, label, active, onClick }) {
+  return (
+    <button className={`chip${active ? ' active' : ''}`} onClick={onClick} aria-haspopup="menu">
+      <span className="label"><b>{name}:</b> {label}</span>
+      <Sym.chevronDown />
+    </button>
+  );
+}
+
+function SortGroupScreen({ s, set }) {
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const openMenu = kind => set({ menu:{ kind, draft: kind === 'sort' ? s.sort : s.group } });
+  const pick = key => {
+    // iOS pull-down: the checkmark moves, then the menu dismisses and applies.
+    const kind = s.menu.kind;
+    set({ menu:{ kind, draft:key } });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => set({ [kind]:key, menu:null }), 180);
+  };
+
+  const sortDef = SORTS.find(x => x.key === s.sort);
+  const groupDef = GROUPS.find(g => g.key === s.group);
+  const tabMatch = TABS.find(t => t.key === s.tab).match;
+  // Pinning only applies when ungrouped: pinned items then ignore the sort (staying in pin order) in their own section.
+  // Once a grouping is applied, pinned items fall back into their normal groups.
+  const usePins = s.group === 'none';
+  const pinnedItems = usePins ? s.pinned.map(id => ITEMS.find(i => i.id === id)).filter(tabMatch) : [];
+  const visible = ITEMS.filter(i => tabMatch(i) && !pinnedItems.includes(i)).sort(sortDef.cmp);
+  const grouped = groupItems(visible, s.group);
+  // Ungrouped: pinned items simply lead the list (no section headers); the pin icon marks them
+  const sections = pinnedItems.length ? [{ label:null, items:[...pinnedItems, ...visible] }] : grouped;
+  const togglePin = id => set({ pinned: s.pinned.includes(id) ? s.pinned.filter(p => p !== id) : [...s.pinned, id] });
+  const unreadCount = ITEMS.filter(i => i.unread).length;
+
+  return (
+    <div className="screen">
+      <div className="island-pill" />
+      <div className="navbar">
+        <div className="status-bar">
+          <span className="time">9:41</span>
+          <span className="island" />
+          <span className="levels" aria-hidden="true">
+            <img src={ICON['cellular.svg']} width="19.2" height="12.226" alt="" />
+            <img src={ICON['wifi.svg']} width="17.142" height="12.328" alt="" />
+            <img src={ICON['battery.svg']} width="27.328" height="13" alt="" />
+          </span>
+        </div>
+        <div className="title-row">
+          <button className="back"><Sym.chevronLeft />Back</button>
+          <div className="nav-title">All Conversations</div>
+          <button className="more" aria-label="More"><Sym.ellipsisCircle /></button>
+        </div>
+        <div className="chips">
+          <Chip name="Sort" label={sortDef.label} active={s.sort !== 'lastUpdated'} onClick={() => openMenu('sort')} />
+          <Chip name="Group" label={groupDef.label} active={s.group !== 'none'} onClick={() => openMenu('group')} />
+        </div>
+        <div className="seg-wrap">
+          <div className="seg" role="tablist">
+            {TABS.map(t => (
+              <button key={t.key} role="tab" className={s.tab === t.key ? 'on' : ''} aria-selected={s.tab === t.key} onClick={() => set({ tab:t.key })}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="rows">
+        {sections.map(sec => (
+          <React.Fragment key={sec.label || 'all'}>
+            {sec.label && <div className="group-header">{sec.label}</div>}
+            {sec.items.map(i => <SwipeRow key={i.id} item={i} pinned={s.pinned.includes(i.id)} onTogglePin={() => togglePin(i.id)} />)}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="toolbar">
+        <span className="toolbar-spacer" aria-hidden="true" />
+        <span className="count">{unreadCount} unread</span>
+        <button aria-label="New conversation"><Sym.compose /></button>
+      </div>
+      <div className="home-indicator" />
+
+      {s.menu && <Menu kind={s.menu.kind} value={s.menu.draft} onPick={pick} onClose={() => set({ menu:null })} />}
+    </div>
+  );
+}
+
+/* ---------------- prototype shell ---------------- */
+
+const INITIAL = { ...FRAMES[0].state, tab:'all', pinned:['beds', 'obs'] };
+
+function currentFrame(s) {
+  if (s.tab !== 'all') return -1;
+  return FRAMES.findIndex(({ state:f }) =>
+    f.sort === s.sort && f.group === s.group &&
+    (f.menu ? s.menu && f.menu.kind === s.menu.kind && f.menu.draft === s.menu.draft : !s.menu));
+}
+
+function App() {
+  const [s, setS] = useState(INITIAL);
+  const set = patch => setS(prev => ({ ...prev, ...patch }));
+  const cur = currentFrame(s);
+
+  return (
+    <div className="page">
+      <SortGroupScreen s={s} set={set} />
+      <aside className="panel">
+        <h1>Sorting &amp; Grouping · iOS</h1>
+        <p>Use the Sort and Group buttons on the phone, or jump straight to a Figma frame. Drag a row to the right to pin or unpin it.</p>
+        <h2>Figma frames</h2>
+        <div className="frames">
+          {FRAMES.map((f, i) => (
+            <button key={f.node} className={`frame${cur === i ? ' current' : ''}`} onClick={() => setS(prev => ({ ...prev, tab:'all', ...f.state }))}>
+              <span className="n">{i + 1}</span>
+              <span>{f.title}<small>{f.sub} · {f.node}</small></span>
+            </button>
+          ))}
+        </div>
+        <button className="reset" onClick={() => setS(INITIAL)}>Reset prototype</button>
+      </aside>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
