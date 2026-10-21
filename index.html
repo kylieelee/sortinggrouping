@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sorting &amp; Grouping — Alertive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-40:#14304c; --navy-50:#0c2237; --text-10:#5c5d5f; --menu-label:#5b6c7d;
+    --title-unread:#0d2f4b; --text-body:#212121; --time-read:#616161;
+    --group-bg:#dde2e7; --chip-enabled:#eeeeef; --chip-active:#b6bdc3;
+    --urgent:#ff3b30; --pill-medium:#eb8333; --low:#43a047; --flag:#ef6c00; --fab:#ef7d6b; --row-border:#e0e0e0;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:#e9ecef; font-family:'Roboto',-apple-system,'Segoe UI',sans-serif; color:var(--text-body); }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  img { display:block; }
+
+  .page { min-height:100vh; padding:32px 16px; display:flex; justify-content:center; align-items:flex-start; }
+
+  /* ---------- device ---------- */
+  .screen { position:relative; width:412px; height:917px; background:#fff; border-radius:24px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+  .header { position:absolute; top:0; left:0; width:412px; background:#fff; z-index:3; display:flex; flex-direction:column; }
+
+  .status-bar { height:52px; position:relative; display:flex; align-items:center; justify-content:space-between; padding:0 24px; font-size:14px; font-weight:500; color:#1d1b20; }
+  .status-bar .cutout { position:absolute; left:50%; top:18px; width:24px; height:24px; margin-left:-12px; border-radius:50%; background:#1d1b20; }
+  .status-bar .sys { display:flex; gap:6px; align-items:center; }
+
+  .app-bar { height:56px; padding:16px; display:flex; gap:32px; align-items:center; }
+  .app-bar .titles { flex:1 0 0; min-width:0; }
+  .app-bar .title { font-size:20px; line-height:28px; font-weight:500; color:rgba(0,0,0,.87); }
+  .app-bar .subtitle { font-size:12px; line-height:16px; letter-spacing:.4px; color:var(--text-10); }
+
+  .chips { display:flex; gap:8px; align-items:flex-end; padding:8px 16px; }
+  .chip { flex:1 0 0; min-width:0; height:32px; padding:4px; border-radius:16px; background:var(--chip-enabled); display:flex; justify-content:space-between; align-items:stretch; text-align:left; }
+  .chip.active { background:var(--chip-active); }
+  .chip .label { display:flex; align-items:center; padding:0 8px; font-size:14px; line-height:20px; letter-spacing:.25px; color:rgba(0,0,0,.87); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chip .label b { font-weight:700; margin-right:4px; }
+  .chip .icon { width:21px; padding-right:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  .tabs { height:48px; display:flex; align-items:center; background:#fff; box-shadow:0 .5px 1px rgba(0,0,0,.1), 0 4px 8px rgba(0,0,0,.2); }
+  .tab { min-width:90px; max-width:360px; display:flex; flex-direction:column; align-items:center; position:relative; height:48px; justify-content:center; }
+  .tab span { padding:12px; font-size:14px; line-height:24px; font-weight:500; letter-spacing:.14px; text-transform:uppercase; color:var(--navy-40); }
+  .tab img { position:absolute; left:0; bottom:0; width:100%; height:2px; }
+
+  .rows { position:absolute; top:204px; left:0; bottom:0; width:412px; overflow-y:auto; padding:8px 0; }
+  .rows.grouped { padding-top:0; }
+  .rows::-webkit-scrollbar { display:none; }
+  .group-header { background:var(--group-bg); padding:8px 12px; font-size:12px; line-height:16px; font-weight:500; letter-spacing:.5px; color:var(--navy-40); text-transform:uppercase; }
+
+  /* Rows are authored at 1.1x in Figma and scaled to 83% — zoom keeps that geometry in flow. */
+  .row { zoom:.83; display:flex; align-items:stretch; border-bottom:1.1px solid var(--row-border); width:100%; text-align:left; }
+  .row:hover { background:#fafbfc; }
+  .row .bar { width:6.603px; flex-shrink:0; }
+  .row.has-bar .bar { width:14.465px; }
+  .row .body { flex:1 0 0; min-width:0; display:flex; flex-direction:column; gap:6.6px; padding:13.2px 17.6px 14.3px; }
+  .row.has-bar .body { gap:8.8px; padding-left:11.6px; }
+  .row .top { display:flex; gap:8.8px; align-items:center; }
+  .row .top img { width:24px; height:24px; flex-shrink:0; }
+  .row .name { flex:1 0 0; min-width:0; font-size:17.6px; letter-spacing:.165px; padding:1.1px 0; color:var(--text-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .time { font-size:15.4px; color:var(--time-read); white-space:nowrap; }
+  .row .flag { width:24px; height:24px; flex-shrink:0; color:var(--flag); }
+  .row.unread .name, .row.unread .time { font-weight:700; color:var(--title-unread); }
+  .row .preview { font-size:16.5px; line-height:22.275px; max-height:46.2px; overflow:hidden; color:var(--text-10); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .row.unread .preview { font-weight:500; }
+  .row .grid { display:grid; grid-template-columns:101.2px minmax(0,1fr); column-gap:13.2px; row-gap:3.3px; font-size:16.5px; }
+  .row .grid .k { color:var(--text-10); }
+  .row .grid .v { color:var(--text-body); }
+  .row .created { font-size:14.3px; color:var(--text-10); padding-top:2.2px; }
+  .row.has-bar .created { padding-top:0; }
+
+  /* Row style from frame 96:8422: bar colour = priority, rotated label, greyer meta text */
+  .row { position:relative; }
+  .row .bar-label { position:absolute; left:0; top:0; bottom:1.1px; width:14.465px; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  .row .bar-label span { transform:rotate(-90deg); font-size:13.2px; font-weight:500; letter-spacing:.44px; color:#000; white-space:nowrap; }
+  .row .grid .k { color:#757575; }
+  .row .grid .v.strong { color:#000; }
+  .row .created { color:#9e9e9e; }
+  .row .preview { color:#757575; }
+  .row.unread .preview { color:var(--time-read); }
+
+  /* ---------- prototype controls (outside the device) ---------- */
+  .page { gap:32px; flex-wrap:wrap; }
+  .panel { width:280px; font-size:14px; color:var(--navy-50); }
+  .panel h1 { font-size:18px; line-height:24px; margin:0 0 4px; font-weight:700; }
+  .panel p { margin:0 0 16px; color:var(--text-10); line-height:20px; }
+  .panel h2 { font-size:12px; line-height:16px; letter-spacing:.5px; font-weight:500; color:var(--menu-label); margin:20px 0 8px; text-transform:uppercase; }
+  .frames { display:flex; flex-direction:column; gap:4px; }
+  .frame { display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:8px 10px; border-radius:8px; background:#fff; border:1px solid transparent; line-height:18px; }
+  .frame:hover { border-color:var(--chip-active); }
+  .frame.current { background:var(--navy-50); color:#fff; }
+  .frame .n { width:22px; height:22px; border-radius:50%; background:var(--chip-enabled); color:var(--navy-50); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .frame.current .n { background:#28bad1; color:var(--navy-50); }
+  .frame small { display:block; font-size:11px; opacity:.7; }
+  .reset { margin-top:16px; font-size:13px; text-decoration:underline; color:var(--navy-40); }
+
+  .fab { position:absolute; left:340px; top:825.72px; width:56px; height:56px; border-radius:40px; background:var(--fab); display:flex; align-items:center; justify-content:center; z-index:2;
+         filter:drop-shadow(0 .8px .75px rgba(0,0,0,.1)) drop-shadow(0 6px 6px rgba(0,0,0,.2)); }
+  .home-indicator { position:absolute; left:50%; bottom:8px; width:144px; height:5px; margin-left:-72px; border-radius:100px; background:rgba(0,0,0,.3); z-index:2; }
+
+  .scrim { position:absolute; inset:0; z-index:4; }
+  .menu { position:absolute; top:156px; width:250px; background:#fff; border-radius:8px; padding:8px 12px 8px 0; z-index:5; overflow:hidden;
+          box-shadow:0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3); }
+  .menu .heading { padding:0 12px; font-size:12px; line-height:16px; font-weight:500; letter-spacing:.5px; color:var(--menu-label); }
+  .menu .opt { display:flex; gap:7px; align-items:center; width:100%; text-align:left; font-size:14px; line-height:20px; letter-spacing:.25px; color:#000; }
+  .radio { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
+  .opt:hover .radio { background:rgba(29,27,32,.08); }
+  .radio i { width:20px; height:20px; border-radius:50%; border:2px solid #49454f; display:flex; align-items:center; justify-content:center; }
+  .radio.on i { border-color:var(--navy-40); }
+  .radio.on i::after { content:''; width:10px; height:10px; border-radius:50%; background:var(--navy-40); }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+// Icons inlined so this file works on its own
+const ICON = {
+  "arrow-back.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJhcnJvd19iYWNrIj4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTIwIDExSDcuODNMMTMuNDIgNS40MUwxMiA0TDQgMTJMMTIgMjBMMTMuNDEgMTguNTlMNy44MyAxM0gyMFYxMVoiIGZpbGw9ImJsYWNrIi8+CjwvZz4KPC9zdmc+Cg==",
+  "chat.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJjaGF0Ij4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTIwIDJINEMyLjkgMiAyLjAxIDIuOSAyLjAxIDRMMiAyMkw2IDE4SDIwQzIxLjEgMTggMjIgMTcuMSAyMiAxNlY0QzIyIDIuOSAyMS4xIDIgMjAgMlpNNiA5SDE4VjExSDZWOVpNMTQgMTRINlYxMkgxNFYxNFpNMTggOEg2VjZIMThWOFoiIGZpbGw9IiMyOTlCNDUiLz4KPC9nPgo8L3N2Zz4K",
+  "chevron-active.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSImIzI0MDsmIzE1OTsmIzE0NzsmIzE0MTsgaWNvbiI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik01LjU1NzUgNi4yMjEyNUw5IDkuNjU2MjVMMTIuNDQyNSA2LjIyMTI1TDEzLjUgNy4yNzg3NUw5IDExLjc3ODdMNC41IDcuMjc4NzVMNS41NTc1IDYuMjIxMjVaIiBmaWxsPSIjMTQzMDRDIi8+CjwvZz4KPC9zdmc+Cg==",
+  "chevron-default.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSImIzI0MDsmIzE1OTsmIzE0NzsmIzE0MTsgaWNvbiI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik0xMi40NDI1IDYuMjIxMjVMOSA5LjY1NjI1TDUuNTU3NSA2LjIyMTI1TDQuNSA3LjI3ODc1TDkgMTEuNzc4N0wxMy41IDcuMjc4NzVMMTIuNDQyNSA2LjIyMTI1WiIgZmlsbD0iYmxhY2siLz4KPC9nPgo8L3N2Zz4K",
+  "chevron-enabled.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSImIzI0MDsmIzE1OTsmIzE0NzsmIzE0MTsgaWNvbiI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik0xMi40NDI1IDYuMjIxMjVMOSA5LjY1NjI1TDUuNTU3NSA2LjIyMTI1TDQuNSA3LjI3ODc1TDkgMTEuNzc4N0wxMy41IDcuMjc4NzVMMTIuNDQyNSA2LjIyMTI1WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC44NyIvPgo8L2c+Cjwvc3ZnPgo=",
+  "edit.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJlZGl0Ij4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTIuOTk4NzUgMTcuMjUxMlYyMS4wMDEzSDYuNzQ4NzVMMTcuODA4OCA5Ljk0MTI1TDE0LjA1ODggNi4xOTEyNUwyLjk5ODc1IDE3LjI1MTJaTTIwLjcwODcgNy4wNDEyNUMyMS4wOTg3IDYuNjUxMjUgMjEuMDk4NyA2LjAyMTI1IDIwLjcwODcgNS42MzEyNUwxOC4zNjg4IDMuMjkxMjVDMTcuOTc4OCAyLjkwMTI1IDE3LjM0ODggMi45MDEyNSAxNi45NTg3IDMuMjkxMjVMMTUuMTI4OCA1LjEyMTI1TDE4Ljg3ODcgOC44NzEyNUwyMC43MDg3IDcuMDQxMjVaIiBmaWxsPSIjMTQzMDRDIi8+CjwvZz4KPC9zdmc+Cg==",
+  "person.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJwZXJzb24iPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTJDMTQuMjEgMTIgMTYgMTAuMjEgMTYgOEMxNiA1Ljc5IDE0LjIxIDQgMTIgNEM5Ljc5IDQgOCA1Ljc5IDggOEM4IDEwLjIxIDkuNzkgMTIgMTIgMTJaTTEyIDE0QzkuMzMgMTQgNCAxNS4zNCA0IDE4VjIwSDIwVjE4QzIwIDE1LjM0IDE0LjY3IDE0IDEyIDE0WiIgZmlsbD0iIzAwNzNGRiIvPgo8L2c+Cjwvc3ZnPgo=",
+  "search.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJhY3Rpb24vc2VhcmNoIj4KPHBhdGggaWQ9Imljb24vYWN0aW9uL3NlYXJjaF8yNHB4IiBkPSJNOS43NTUgMy4yNTVDMTMuMzQ1IDMuMjU1IDE2LjI1NSA2LjE2NSAxNi4yNTUgOS43NTVDMTYuMjU1IDExLjM2NSAxNS42NjQ3IDEyLjg0NTUgMTQuNjg0NyAxMy45ODU1TDE0Ljk2NSAxNC4yNTVIMTUuNzU1TDIwLjc0NTIgMTkuMjU1TDE5LjI1NSAyMC43NDUyTDE0LjI1NSAxNS43NTVWMTQuOTY1TDEzLjk4NTUgMTQuNjg0N0MxMi44NDU1IDE1LjY2NDcgMTEuMzY1IDE2LjI1NSA5Ljc1NSAxNi4yNTVDNi4xNjUgMTYuMjU1IDMuMjU1IDEzLjM0NSAzLjI1NSA5Ljc1NUMzLjI1NSA2LjE2NSA2LjE2NSAzLjI1NSA5Ljc1NSAzLjI1NVpNOS43NTUgNS4yNTVDNy4yNjUgNS4yNTUgNS4yNTUgNy4yNjUgNS4yNTUgOS43NTVDNS4yNTUgMTIuMjQ1IDcuMjY1IDE0LjI1NSA5Ljc1NSAxNC4yNTVDMTIuMjQ1IDE0LjI1NSAxNC4yNTUgMTIuMjQ1IDE0LjI1NSA5Ljc1NUMxNC4yNTUgNy4yNjUgMTIuMjQ1IDUuMjU1IDkuNzU1IDUuMjU1WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjwvZz4KPC9zdmc+Cg==",
+  "tab-indicator.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjkwIiBoZWlnaHQ9IjIiIHZpZXdCb3g9IjAgMCA5MCAyIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBpZD0iaW5kaWNhdG9yIiBkPSJNMCAxSDkwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZT0iIzE0MzA0QyIvPgo8L3N2Zz4K",
+  "task-read.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJkb21haW5fdmVyaWZpY2F0aW9uIj4KPGcgaWQ9IlZlY3RvciI+CjxwYXRoIGQ9Ik0xNi42IDEwLjg4TDE1LjE4IDkuNDZMMTAuOTQgMTMuNzFMOC44MiAxMS41OEw3LjQgMTNMMTAuOTQgMTYuNTRMMTYuNiAxMC44OFoiIGZpbGw9IiM2RDQyQjgiLz4KPHBhdGggZD0iTTE5IDRINUMzLjg5IDQgMyA0LjkgMyA2VjE4QzMgMTkuMSAzLjg5IDIwIDUgMjBIMTlDMjAuMSAyMCAyMSAxOS4xIDIxIDE4VjZDMjEgNC45IDIwLjExIDQgMTkgNFpNMTkgMThINVY4SDE5VjE4WiIgZmlsbD0iIzZENDJCOCIvPgo8L2c+CjwvZz4KPC9zdmc+Cg==",
+  "task-unread.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJkb21haW5fdmVyaWZpY2F0aW9uIj4KPGcgaWQ9IlZlY3RvciI+CjxwYXRoIGQ9Ik0xNi42IDEwLjg4TDE1LjE4IDkuNDZMMTAuOTQgMTMuNzFMOC44MiAxMS41OEw3LjQgMTNMMTAuOTQgMTYuNTRMMTYuNiAxMC44OFoiIGZpbGw9IiM4MDAwODAiLz4KPHBhdGggZD0iTTE5IDRINUMzLjg5IDQgMyA0LjkgMyA2VjE4QzMgMTkuMSAzLjg5IDIwIDUgMjBIMTlDMjAuMSAyMCAyMSAxOS4xIDIxIDE4VjZDMjEgNC45IDIwLjExIDQgMTkgNFpNMTkgMThINVY4SDE5VjE4WiIgZmlsbD0iIzgwMDA4MCIvPgo8L2c+CjwvZz4KPC9zdmc+Cg==",
+  "warning.svg": "data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJ3YXJuaW5nIj4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTEgMjEuNUgyM0wxMiAyLjVMMSAyMS41Wk0xMyAxOC41SDExVjE2LjVIMTNWMTguNVpNMTMgMTQuNUgxMVYxMC41SDEzVjE0LjVaIiBmaWxsPSIjRkYzQjMwIi8+CjwvZz4KPC9zdmc+Cg=="
+};
+
+/* ---------------- data ---------------- */
+
+// updated = minutes since midnight 5 Aug (drives the time column + "updated" sorts)
+// created = minutes relative to midnight 5 Aug (negative = 4 Aug)
+const ITEMS = [
+  { id:'ward4',   kind:'chat',   title:'Ward 4 Nursing Team', unread:true,  updated:16*60+51, created:9*60+30,
+    preview:'Caty Sovejanu: nothing new yet, handover note was vague so waiting on the SHO…', priority:null, status:null },
+  { id:'bloods',  kind:'task',   title:'Bloods — Bay 3, Mr A. Okafor', unread:true, updated:16*60+40, created:8*60+12,
+    priority:'medium', type:'Bloods', site:'Derby Royal', ward:'Ward 4', bay:'Bay 3', status:'In Progress',
+    statusDetail:'In progress at 13:13', raisedBy:'Kylie Lee' },
+  { id:'cardiac', flagged:true, kind:'alert',  title:'Cardiac arrest — ICU Bed 2', unread:true, updated:16*60+12, created:16*60+10,
+    priority:'urgent', detail:'Broadcast · Raised by Switchboard · 3 responders', ward:'ICU', status:'Awaiting response',
+    raisedBy:'Emergency Switchboard' },
+  { id:'cannula', flagged:true, kind:'task',   title:'💉 Cannula re-site — Bay 1', unread:false, updated:15*60+35, created:11*60+5,
+    priority:'high', type:'Cannula', site:'Derby Royal', ward:'Ward 7', bay:'Bay 1', status:'In Progress',
+    statusDetail:'Done at 12:45', raisedBy:'Cardiology Registrar' },
+  { id:'head',    flagged:true, kind:'person', title:'Head Nurse', unread:false, updated:14*60+59, created:13*60+20,
+    preview:'Head Nurse: chest film for bay 5 is back on PACS, reported as clear', priority:null, status:null },
+  { id:'luke',    kind:'person', title:'Luke Morgan', unread:false, updated:12*60+9, created:-(24*60)+22*60+40,
+    preview:'Luke Morgan: I can cover the twilight shift tomorrow reported as clear', priority:null, status:null },
+  // Extra example messages. Created 11:06–11:52 and updated before 12:09, so the Figma frames' top rows stay in the same order.
+  { id:'fall',    flagged:true, kind:'alert', title:'Patient fall — Ward 7, Bay 4', unread:true, updated:12*60+1, created:11*60+52,
+    priority:'high', ward:'Ward 7', status:'Awaiting response', raisedBy:'Ward 7 Nurse in Charge' },
+  { id:'obs',     kind:'task',   title:'Obs round — Bay 5', unread:false, updated:11*60+58, created:11*60+20,
+    priority:'medium', type:'Observations', site:'Derby Royal', ward:'Ward 7', bay:'Bay 5', status:'Done',
+    statusDetail:'Done at 11:58', raisedBy:'Caty Sovejanu' },
+  { id:'pharmacy', kind:'chat',  title:'Pharmacy Queries', unread:false, updated:11*60+47, created:11*60+12,
+    preview:'Priya Nair: TTOs for bay 6 are ready for collection, can someone from Ward 7 pop down?', priority:null, status:null },
+  { id:'sarah',   flagged:true, kind:'person', title:'Dr Sarah Patel', unread:true, updated:11*60+40, created:11*60+30,
+    preview:'Dr Sarah Patel: can you chase the bloods for Mr Okafor before the ward round?', priority:null, status:null },
+  { id:'ecg',     kind:'task',   title:'ECG — Bay 2, Mrs D. Whitfield', unread:true, updated:11*60+33, created:11*60+15,
+    priority:'high', type:'ECG', site:'Derby Royal', ward:'Ward 4', bay:'Bay 2', status:'Awaiting response',
+    statusDetail:'Awaiting response', raisedBy:'Dr Sarah Patel' },
+  { id:'beds',    kind:'chat',   title:'Bed Management', unread:false, updated:11*60+21, created:11*60+8,
+    preview:'Tom Reid: 2 side rooms free on Ward 7 from midday, flag any infection control needs', priority:null, status:null },
+  { id:'pressure', kind:'task',  title:'Pressure area check — Bay 8, Mrs E. Clarke', unread:false, updated:11*60+50, created:11*60+25,
+    priority:'low', type:'Skin integrity', site:'Derby Royal', ward:'Ward 4', bay:'Bay 8', status:'In Progress',
+    statusDetail:'In progress at 11:50', raisedBy:'Head Nurse' },
+  { id:'catheter', kind:'task',  title:'Catheter review — Bay 6, Mr J. Hughes', unread:false, updated:11*60+10, created:11*60+6,
+    priority:null, type:'Catheter', site:'Derby Royal', ward:'Ward 7', bay:'Bay 6', status:'In Progress',
+    statusDetail:'In progress at 11:10', raisedBy:'Luke Morgan' },
+];
+
+const SORTS = [
+  { key:'lastUpdated',  label:'Last updated', menu:'Last updated (Default)', cmp:(a,b)=>b.updated-a.updated },
+  { key:'firstUpdated', label:'First updated', cmp:(a,b)=>a.updated-b.updated },
+  { key:'lastCreated',  label:'Last created',  cmp:(a,b)=>b.created-a.created },
+  { key:'firstCreated', label:'First created', cmp:(a,b)=>a.created-b.created },
+];
+
+// Order matches the GROUP BY menu in Figma (96:9496 / 96:9784)
+const GROUPS = [
+  { key:'none',     label:'None' },
+  { key:'read',     label:'Read/Unread',      by:i => i.unread ? 'Unread' : 'Read', order:['Unread','Read'] },
+  { key:'status',   label:'Status',           by:i => i.status || 'No status', order:['Awaiting response','In Progress','Done','No status'] },
+  { key:'priority', label:'Priority',         by:i => ({urgent:'Urgent',high:'High',medium:'Medium',low:'Low'})[i.priority] || 'No priority',
+                                              order:['Urgent','High','Medium','Low','No priority'] },
+  { key:'patientLocation', label:'Patient Location', by:i => i.bay ? `${i.ward}, ${i.bay}` : 'No patient location' },
+  { key:'location', label:'Location',         by:i => i.ward || 'No location' },
+  { key:'taskType', label:'Task Type',        by:i => i.type || 'Not a task' },
+  { key:'flagged',  label:'Flagged',          by:i => i.flagged ? 'Flagged' : 'Not flagged', order:['Flagged','Not flagged'] },
+];
+
+const TABS = [
+  { key:'all',    label:'All',    match:() => true },
+  { key:'chats',  label:'Chats',  match:i => i.kind === 'chat' || i.kind === 'person' },
+  { key:'alerts', label:'Alerts', match:i => i.kind === 'alert' },
+  { key:'tasks',  label:'Tasks',  match:i => i.kind === 'task' },
+];
+
+// The 7 Figma frames, as prototype states
+const FRAMES = [
+  { node:'96:8422',  title:'Default list',            sub:'Last updated',       state:{ sort:'lastUpdated',  group:'none',     menu:null, touched:false } },
+  { node:'96:8683',  title:'Sort menu',               sub:'Last updated',       state:{ sort:'lastUpdated',  group:'none',     menu:{ kind:'sort',  draft:'lastUpdated' } } },
+  { node:'96:8959',  title:'Sort menu',               sub:'First created picked', state:{ sort:'lastUpdated',  group:'none',     menu:{ kind:'sort',  draft:'firstCreated' } } },
+  { node:'96:9235',  title:'Sorted: First created',   sub:'Sort chip active',   state:{ sort:'firstCreated', group:'none',     menu:null } },
+  { node:'96:9496',  title:'Group menu',              sub:'None',               state:{ sort:'firstCreated', group:'none',     menu:{ kind:'group', draft:'none' } } },
+  { node:'96:9784',  title:'Group menu',              sub:'Priority picked',    state:{ sort:'firstCreated', group:'none',     menu:{ kind:'group', draft:'priority' } } },
+  { node:'96:10072', title:'Grouped: Priority',       sub:'Both chips active',  state:{ sort:'firstCreated', group:'priority', menu:null } },
+];
+
+const fmtTime = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+const fmtCreated = m => {
+  const day = m < 0 ? 4 : 5;
+  const mins = ((m % 1440) + 1440) % 1440;
+  return `Created ${day} Aug at ${fmtTime(mins)}`;
+};
+
+function groupItems(items, groupKey) {
+  const g = GROUPS.find(x => x.key === groupKey);
+  if (!g.by) return [{ label:null, items }];
+  const map = new Map();
+  items.forEach(i => { const k = g.by(i); if (!map.has(k)) map.set(k, []); map.get(k).push(i); });
+  const keys = [...map.keys()];
+  if (g.order) keys.sort((a,b) => g.order.indexOf(a) - g.order.indexOf(b));
+  return keys.map(k => ({ label:k, items:map.get(k) }));
+}
+
+/* ---------------- row ---------------- */
+
+const KIND_ICON = { chat:'chat.svg', person:'person.svg', alert:'warning.svg' };
+const PRIORITY_BAR = { urgent:'var(--urgent)', high:'#ff0000', medium:'var(--pill-medium)', low:'var(--low)' };
+const PRIORITY_LABEL = { high:'High', medium:'Medium', low:'Low' };
+
+function Row({ item }) {
+  const icon = item.kind === 'task' ? (item.unread ? 'task-unread.svg' : 'task-read.svg') : KIND_ICON[item.kind];
+  const hasBar = !!item.priority;
+  return (
+    <button className={`row${item.unread ? ' unread' : ''}${hasBar ? ' has-bar' : ''}`}>
+      <div className="bar" style={{ background: hasBar ? PRIORITY_BAR[item.priority] : 'transparent' }} />
+      {PRIORITY_LABEL[item.priority] && (
+        <div className="bar-label"><span>{PRIORITY_LABEL[item.priority]}</span></div>
+      )}
+      <div className="body">
+        <div className="top">
+          <img src={ICON[icon]} width="24" height="24" alt="" />
+          <div className="name">{item.title}</div>
+          {item.flagged && (
+            // Material Icons (M2) "flag", filled
+            <svg className="flag" viewBox="0 0 24 24" role="img" aria-label="Flagged">
+              <path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z" fill="currentColor" />
+            </svg>
+          )}
+          <div className="time">{fmtTime(item.updated)}</div>
+        </div>
+        {item.kind === 'task' && (
+          <div className="grid">
+            <div className="k">Type</div><div className="v">{item.type}</div>
+            <div className="k">Status</div><div className="v">{item.statusDetail}</div>
+            <div className="k">Location</div><div className="v">{item.site} · {item.ward}, {item.bay}</div>
+            <div className="k">Raised by</div><div className="v strong">{item.raisedBy}</div>
+          </div>
+        )}
+        {item.kind === 'alert' && (
+          <div className="grid">
+            <div className="k">Status</div><div className="v">{item.status}</div>
+            <div className="k">Raised by</div><div className="v">{item.raisedBy}</div>
+          </div>
+        )}
+        {item.preview && <div className="preview">{item.preview}</div>}
+        <div className="created">{fmtCreated(item.created)}</div>
+      </div>
+    </button>
+  );
+}
+
+/* ---------------- menu ---------------- */
+
+function Menu({ kind, value, onPick, onClose }) {
+  const opts = kind === 'sort' ? SORTS : GROUPS;
+  return (
+    <>
+      <div className="scrim" onClick={onClose} />
+      <div className="menu" role="radiogroup" style={{ left: kind === 'sort' ? 16 : 146 }}>
+        <div className="heading">{kind === 'sort' ? 'SORT BY' : 'GROUP BY'}</div>
+        {opts.map(o => (
+          <button key={o.key} className="opt" role="radio" aria-checked={value === o.key} onClick={() => onPick(o.key)}>
+            <span className={`radio${value === o.key ? ' on' : ''}`}><i /></span>
+            {o.menu || o.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ---------------- screen ---------------- */
+
+function Chip({ name, label, active, pristine, onClick }) {
+  const chevron = active ? 'chevron-active.svg' : pristine ? 'chevron-default.svg' : 'chevron-enabled.svg';
+  return (
+    <button className={`chip${active ? ' active' : ''}`} onClick={onClick} aria-haspopup="menu">
+      <span className="label"><b>{name}:</b>{label}</span>
+      <span className="icon"><img src={ICON[chevron]} width="18" height="18" alt="" /></span>
+    </button>
+  );
+}
+
+function SortGroupScreen({ s, set }) {
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const openMenu = kind => set({ touched:true, menu:{ kind, draft: kind === 'sort' ? s.sort : s.group } });
+  const pick = key => {
+    // Mirror the Android radio-menu feel: show the selection, then apply and dismiss.
+    const kind = s.menu.kind;
+    set({ menu:{ kind, draft:key } });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => set({ [kind]:key, menu:null }), 180);
+  };
+
+  const sortDef = SORTS.find(x => x.key === s.sort);
+  const groupDef = GROUPS.find(g => g.key === s.group);
+  const visible = ITEMS.filter(TABS.find(t => t.key === s.tab).match).sort(sortDef.cmp);
+  const sections = groupItems(visible, s.group);
+  const unreadCount = ITEMS.filter(i => i.unread).length;
+  const pristine = !s.touched && !s.menu && s.sort === 'lastUpdated' && s.group === 'none';
+
+  return (
+    <div className="screen">
+      <div className="header">
+        <div className="status-bar">
+          <span>9:30</span>
+          <span className="cutout" />
+          <span className="sys" aria-hidden="true">
+            <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 12 0 3.5a11.5 11.5 0 0 1 16 0z" fill="#1d1b20" opacity=".3"/><path d="M8 12 3.2 7a6.8 6.8 0 0 1 9.6 0z" fill="#1d1b20" opacity=".3"/></svg>
+            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M12 0v12H0z" fill="#1d1b20"/></svg>
+            <svg width="8" height="14" viewBox="0 0 8 14"><rect x="2.5" width="3" height="2" rx=".5" fill="#1d1b20"/><rect y="1.5" width="8" height="12.5" rx="1.5" fill="#1d1b20"/></svg>
+          </span>
+        </div>
+        <div className="app-bar">
+          <button aria-label="Back"><img src={ICON['arrow-back.svg']} width="24" height="24" alt="" /></button>
+          <div className="titles">
+            <div className="title">All Conversations</div>
+            <div className="subtitle">{unreadCount} unread conversations</div>
+          </div>
+          <button aria-label="Search"><img src={ICON['search.svg']} width="24" height="24" alt="" /></button>
+        </div>
+        <div className="chips">
+          <Chip name="Sort" label={sortDef.label} active={s.sort !== 'lastUpdated'} pristine={pristine} onClick={() => openMenu('sort')} />
+          <Chip name="Group" label={groupDef.label} active={s.group !== 'none'} pristine={pristine} onClick={() => openMenu('group')} />
+        </div>
+        <div className="tabs" role="tablist">
+          {TABS.map(t => (
+            <button key={t.key} className="tab" role="tab" aria-selected={s.tab === t.key} onClick={() => set({ tab:t.key })}>
+              <span>{t.label}</span>
+              {s.tab === t.key && <img src={ICON['tab-indicator.svg']} alt="" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={`rows${s.group !== 'none' ? ' grouped' : ''}`}>
+        {sections.map(sec => (
+          <React.Fragment key={sec.label || 'all'}>
+            {sec.label && <div className="group-header">{sec.label}</div>}
+            {sec.items.map(i => <Row key={i.id} item={i} />)}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <button className="fab" aria-label="New conversation"><img src={ICON['edit.svg']} width="24" height="24" alt="" /></button>
+      <div className="home-indicator" />
+
+      {s.menu && <Menu kind={s.menu.kind} value={s.menu.draft} onPick={pick} onClose={() => set({ menu:null })} />}
+    </div>
+  );
+}
+
+/* ---------------- prototype shell ---------------- */
+
+const INITIAL = { ...FRAMES[0].state, tab:'all' };
+
+function currentFrame(s) {
+  if (s.tab !== 'all') return -1;
+  return FRAMES.findIndex(({ state:f }) =>
+    f.sort === s.sort && f.group === s.group &&
+    (f.menu ? s.menu && f.menu.kind === s.menu.kind && f.menu.draft === s.menu.draft : !s.menu) &&
+    (f.touched === undefined || f.touched === s.touched));
+}
+
+function App() {
+  const [s, setS] = useState(INITIAL);
+  const set = patch => setS(prev => ({ ...prev, ...patch }));
+  const cur = currentFrame(s);
+
+  return (
+    <div className="page">
+      <SortGroupScreen s={s} set={set} />
+      <aside className="panel">
+        <h1>Sorting &amp; Grouping</h1>
+        <p>Use the Sort and Group chips on the phone, or jump straight to a Figma frame.</p>
+        <h2>Figma frames</h2>
+        <div className="frames">
+          {FRAMES.map((f, i) => (
+            <button key={f.node} className={`frame${cur === i ? ' current' : ''}`}
+                    onClick={() => setS({ touched:true, tab:'all', ...f.state })}>
+              <span className="n">{i + 1}</span>
+              <span>{f.title}<small>{f.sub} · {f.node}</small></span>
+            </button>
+          ))}
+        </div>
+        <button className="reset" onClick={() => setS(INITIAL)}>Reset prototype</button>
+      </aside>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
